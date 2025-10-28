@@ -1,0 +1,136 @@
+# -----------------------------
+# OS / Editor files
+# -----------------------------
+# Windows thumbnail cache, system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+\n+# VS Code
+.vscode/
+
+# JetBrains IDEs
+.idea/
+*.iml
+
+# Editor backups
+*~
+# swap files
+.swp
+\n+# -----------------------------
+# Java / Maven / Spring Boot
+# -----------------------------
+# Maven target
+/target/
+/backend/target/
+
+# Gradle (not used but harmless)
+.gradle/
+
+# Package files
+*.class
+*.jar
+*.war
+*.ear
+
+# Spring Boot properties and logs
+logs/
+*.log
+spring.log
+
+# Spring Boot devtools
+.restart
+
+# IDEA specific
+out/
+
+# -----------------------------
+# Node / Next.js / frontend
+# -----------------------------
+# Node modules
+/frontend/node_modules/
+node_modules/
+
+# Next.js build output
+/.next/
+/frontend/.next/
+
+# Next.js static export
+/out/
+
+# Next.js production build
+build/
+
+# npm logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Ignore backend local/override application properties that may contain secrets
+# Keep the canonical application.properties (template) tracked in repo
+/backend/src/main/resources/application-local.properties
+/backend/src/main/resources/application-*.local.properties
+backend\src\main\resources\application.properties
+
+# Lock files (optional: commit package-lock/yarn.lock for reproducible builds)
+# package-lock.json
+# yarn.lock
+
+# -----------------------------
+# Misc / Project-specific
+# -----------------------------
+# Uploaded user files (don't commit uploads)
+/uploads/
+/uploads/**
+
+# IDE / local settings
+.DS_Store
+.classpath
+.project
+.settings/
+
+# Generated sources
+/generated-sources/
+/generated-test-sources/
+
+# Binary files
+*.exe
+*.dll
+*.so
+*.dylib
+
+# macOS
+.DS_Store
+
+# Certificates, credentials
+*.jks
+keystore.*
+
+# Docker
+docker-compose.override.yml
+.docker/
+
+# Coverage reports
+coverage/
+jacoco.exec
+
+# Test output
+/surefire-reports/
+
+# IntelliJ artifacts
+*.iws
+
+# application.properties
+application.properties
+
+# Uploads
+/uploads/
+
+# End of file
+
