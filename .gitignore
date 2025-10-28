@@ -126,9 +126,6 @@ jacoco.exec
 # IntelliJ artifacts
 *.iws
 
-# application.properties
-application.properties
-
 # Uploads
 /uploads/
 

@@ -34,6 +34,9 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.util.*;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.*;
 
 @Component
 @Slf4j
@@ -56,6 +59,15 @@ public class UserServiceImpl implements UserService {
 
     @Value("${app.user.profile.upload.dir}")
     private String userProfileUploadDir;
+
+    @Autowired
+    private S3Client s3Client;
+
+    @Value("${aws.s3.bucket-name}")
+    private String bucketName;
+
+    @Value("${aws.s3.endpoint}")
+    private String s3Endpoint;
 
 
     @Override
@@ -109,6 +121,11 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    // ============================================
+    // OLD LOCAL FILE STORAGE METHODS (COMMENTED OUT)
+    // ============================================
+    
+    /*
     @Override
     public ResponseEntity<ApiResponseDto<?>> uploadProfileImg(String email, MultipartFile file)
             throws UserServiceLogicException, UserNotFoundException {
@@ -134,7 +151,67 @@ public class UserServiceImpl implements UserService {
 
         throw new UserNotFoundException("User not found with email " + email);
     }
+    */
 
+    // ============================================
+    // NEW CLOUD STORAGE METHODS (AWS S3 / DigitalOcean Spaces)
+    // ============================================
+
+    @Override
+    public ResponseEntity<ApiResponseDto<?>> uploadProfileImg(String email, MultipartFile file)
+            throws UserServiceLogicException, UserNotFoundException {
+        if (existsByEmail(email)) {
+            try {
+                User user = findByEmail(email);
+                String extension = Objects.requireNonNull(file.getOriginalFilename())
+                        .substring(file.getOriginalFilename().lastIndexOf("."));
+                String key = "profile-images/" + user.getUsername() + "-" + System.currentTimeMillis() + extension;
+
+                // Upload to S3/Spaces
+                PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                        .bucket(bucketName)
+                        .key(key)
+                        .contentType(file.getContentType())
+                        .acl(ObjectCannedACL.PUBLIC_READ)
+                        .build();
+
+                s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
+
+                // Generate public URL
+                String publicUrl = s3Endpoint + "/" + bucketName + "/" + key;
+
+                // Delete old image if exists
+                if (user.getProfileImgUrl() != null && !user.getProfileImgUrl().isEmpty()) {
+                    try {
+                        String oldKey = extractKeyFromUrl(user.getProfileImgUrl());
+                        DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+                                .bucket(bucketName)
+                                .key(oldKey)
+                                .build();
+                        s3Client.deleteObject(deleteObjectRequest);
+                    } catch (Exception e) {
+                        log.warn("Failed to delete old profile image: {}", e.getMessage());
+                    }
+                }
+
+                user.setProfileImgUrl(publicUrl);
+                userRepository.save(user);
+
+                return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponseDto<>(
+                        ApiResponseStatus.SUCCESS,
+                        HttpStatus.CREATED,
+                        "Profile image successfully updated!"
+                ));
+            } catch (Exception e) {
+                log.error("Failed to update profile img: {}", e.getMessage());
+                throw new UserServiceLogicException("Failed to update profile image: Try again later!");
+            }
+        }
+
+        throw new UserNotFoundException("User not found with email " + email);
+    }
+
+    /*
     @Override
     public ResponseEntity<ApiResponseDto<?>> getProfileImg(String email) throws UserNotFoundException, IOException, UserServiceLogicException {
         if (existsByEmail(email)) {
@@ -168,7 +245,39 @@ public class UserServiceImpl implements UserService {
 
         throw new UserNotFoundException("User not found with email " + email);
     }
+    */
 
+    @Override
+    public ResponseEntity<ApiResponseDto<?>> getProfileImg(String email) throws UserNotFoundException, IOException, UserServiceLogicException {
+        if (existsByEmail(email)) {
+            try{
+                User user = findByEmail(email);
+
+                if (user.getProfileImgUrl() != null) {
+                    // Return the public URL directly
+                    return ResponseEntity.status(HttpStatus.OK).body(new ApiResponseDto<>(
+                            ApiResponseStatus.SUCCESS,
+                            HttpStatus.OK,
+                            user.getProfileImgUrl()
+                    ));
+                } else {
+                    return ResponseEntity.status(HttpStatus.OK).body(new ApiResponseDto<>(
+                            ApiResponseStatus.SUCCESS,
+                            HttpStatus.OK,
+                            null
+                    ));
+                }
+
+            } catch (Exception e) {
+                log.error("Failed to get profile img: {}", e.getMessage());
+                throw new UserServiceLogicException("Failed to get profile image: Try again later!");
+            }
+        }
+
+        throw new UserNotFoundException("User not found with email " + email);
+    }
+
+    /*
     @Override
     public ResponseEntity<ApiResponseDto<?>> deleteProfileImg(String email) throws UserServiceLogicException, UserNotFoundException {
         if (existsByEmail(email)) {
@@ -196,6 +305,59 @@ public class UserServiceImpl implements UserService {
         }
 
         throw new UserNotFoundException("User not found with email " + email);
+    }
+    */
+
+    @Override
+    public ResponseEntity<ApiResponseDto<?>> deleteProfileImg(String email) throws UserServiceLogicException, UserNotFoundException {
+        if (existsByEmail(email)) {
+            try{
+                User user = findByEmail(email);
+
+                if (user.getProfileImgUrl() != null && !user.getProfileImgUrl().isEmpty()) {
+                    try {
+                        String key = extractKeyFromUrl(user.getProfileImgUrl());
+                        DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+                                .bucket(bucketName)
+                                .key(key)
+                                .build();
+                        s3Client.deleteObject(deleteObjectRequest);
+                    } catch (Exception e) {
+                        log.error("Failed to delete object from S3: {}", e.getMessage());
+                        throw new UserServiceLogicException("Failed to remove profile image: Try again later!");
+                    }
+
+                    user.setProfileImgUrl(null);
+                    userRepository.save(user);
+
+                    return ResponseEntity.status(HttpStatus.OK).body(new ApiResponseDto<>(
+                            ApiResponseStatus.SUCCESS,
+                            HttpStatus.OK,
+                            "Profile image removed successfully!"
+                    ));
+                }
+
+                return ResponseEntity.status(HttpStatus.OK).body(new ApiResponseDto<>(
+                        ApiResponseStatus.SUCCESS,
+                        HttpStatus.OK,
+                        "No profile image to delete"
+                ));
+            } catch (Exception e) {
+                log.error("Failed to delete profile img: {}", e.getMessage());
+                throw new UserServiceLogicException("Failed to remove profile image: Try again later!");
+            }
+        }
+
+        throw new UserNotFoundException("User not found with email " + email);
+    }
+
+    /**
+     * Helper method to extract the S3 key from a full URL
+     * Example: https://nyc3.digitaloceanspaces.com/bucket-name/profile-images/user.jpg -> profile-images/user.jpg
+     */
+    private String extractKeyFromUrl(String url) {
+        String[] parts = url.split("/" + bucketName + "/");
+        return parts.length > 1 ? parts[1] : url;
     }
 
     @Override

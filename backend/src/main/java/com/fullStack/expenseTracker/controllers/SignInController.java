@@ -27,7 +27,6 @@ import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("/expensia/auth")
 public class SignInController {
