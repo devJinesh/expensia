@@ -73,6 +73,8 @@ public class WebSecurityConfig {
         
         // Split comma-separated origins and add to allowed origins list
         List<String> origins = Arrays.asList(allowedOrigins.split(","));
+        // Trim whitespace from each origin
+        origins = origins.stream().map(String::trim).toList();
         configuration.setAllowedOrigins(origins);
         
         // Allow common HTTP methods
@@ -81,10 +83,13 @@ public class WebSecurityConfig {
         // Allow common headers
         configuration.setAllowedHeaders(Arrays.asList("*"));
         
+        // Expose Authorization header for JWT tokens
+        configuration.setExposedHeaders(Arrays.asList("Authorization"));
+        
         // Allow credentials (cookies, authorization headers)
         configuration.setAllowCredentials(true);
         
-        // Max age for preflight requests cache
+        // Max age for preflight requests cache (1 hour)
         configuration.setMaxAge(3600L);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -100,13 +105,17 @@ public class WebSecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth ->
-                        auth.requestMatchers("/expensia/auth/**").permitAll()
+                        auth
+                                // Auth endpoints - public access for signin/signup
+                                .requestMatchers("/expensia/auth/signin").permitAll()
+                                .requestMatchers("/expensia/auth/signup").permitAll()
+                                .requestMatchers("/expensia/auth/signup/verify").permitAll()
+                                .requestMatchers("/expensia/auth/signup/resend").permitAll()
+                                .requestMatchers("/expensia/auth/forgotPassword/**").permitAll()
+                                // OAuth2 endpoints
                                 .requestMatchers("/oauth2/**").permitAll()
                                 .requestMatchers("/login/oauth2/**").permitAll()
-                                .requestMatchers("/expensia/transactiontype/**").permitAll()
-                                .requestMatchers("/expensia/category/**").permitAll()
-                                .requestMatchers("/expensia/transaction/**").permitAll()
-                                .requestMatchers("/expensia/user/**").permitAll()
+                                // All other requests require authentication
                                 .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
